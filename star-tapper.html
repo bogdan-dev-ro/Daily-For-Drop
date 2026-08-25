@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Boom Tapper</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --bg:#0B0817; --bg2:#150E28; --card:#221740; --accent:#FF6B4A;
+    --gold:#FFD166; --text:#F5EEFB; --muted:#9A87B0; --good:#59D69B;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;overflow:hidden;}
+
+  /* ---------- space background: nebula + planets + stars ---------- */
+  #space{position:fixed;inset:0;z-index:0;overflow:hidden;
+    background:radial-gradient(ellipse at 50% -10%, #241a3d 0%, #0B0817 55%);}
+  .nebula{position:absolute;width:480px;height:480px;left:50%;top:22%;transform:translate(-50%,-50%);
+    background:radial-gradient(circle, rgba(255,107,74,.16), rgba(108,60,231,.14) 45%, transparent 72%);
+    filter:blur(26px);}
+  .planet{position:absolute;border-radius:50%;animation:drift 16s ease-in-out infinite;}
+  .p1{width:250px;height:250px;top:-70px;right:-70px;
+    background:radial-gradient(circle at 32% 28%, #ffd3a8, #ff8a4c 42%, #a5391a 75%, #5c1c0d 100%);
+    box-shadow:inset -28px -28px 55px rgba(0,0,0,.55), 0 0 70px rgba(255,138,76,.22);}
+  .p2{width:150px;height:150px;bottom:8%;left:-46px;animation-duration:20s;
+    background:radial-gradient(circle at 30% 25%, #d8ecff, #6fa8dc 45%, #2c5d8a 78%, #142d44 100%);
+    box-shadow:inset -18px -18px 38px rgba(0,0,0,.5), 0 0 46px rgba(111,168,220,.22);}
+  .p2 .ring{position:absolute;left:-38px;top:58px;width:226px;height:34px;
+    border:3px solid rgba(255,255,255,.22);border-radius:50%;transform:rotate(-16deg);}
+  .p3{width:60px;height:60px;top:18%;left:8%;animation-duration:12s;
+    background:radial-gradient(circle at 35% 30%, #e8e2f5, #a99fc2 55%, #4c4266 100%);
+    box-shadow:0 0 20px rgba(169,159,194,.25);}
+  @keyframes drift{0%,100%{transform:translateY(0)}50%{transform:translateY(-16px)}}
+  #sky{position:absolute;inset:0;}
+
+  #app{position:relative;z-index:2;height:100vh;display:flex;flex-direction:column;}
+
+  header{display:flex;justify-content:center;align-items:center;gap:8px;
+    padding:14px 16px;background:linear-gradient(180deg,rgba(11,8,23,.85),transparent);}
+  .badge{display:flex;align-items:center;gap:6px;background:var(--card);
+    padding:6px 12px;border-radius:20px;font-weight:700;font-size:14px;
+    box-shadow:0 0 0 1px rgba(255,255,255,.06) inset;}
+  .badge.gold{color:var(--gold);}
+  .badge.good{color:var(--good);}
+
+  main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:0 16px;text-align:center;}
+  h1{font-weight:800;font-size:22px;letter-spacing:.5px;margin:0 0 2px;
+    text-shadow:0 0 24px rgba(255,107,74,.4);}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:10px;}
+  .stats{display:flex;gap:16px;margin-bottom:18px;font-size:12px;color:var(--muted);}
+  .stats b{color:var(--text);}
+
+  #tapZone{width:196px;height:196px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#FF9A78,var(--accent) 60%,#B8341A 100%);
+    box-shadow:0 0 44px rgba(255,107,74,.5),0 0 0 6px rgba(255,255,255,.05) inset;
+    display:flex;align-items:center;justify-content:center;font-size:58px;
+    transition:transform .08s ease;position:relative;}
+  #tapZone:active{transform:scale(.92);}
+  #tapZone::after{content:"";position:absolute;inset:-14px;border-radius:50%;
+    border:2px dashed rgba(255,209,102,.35);animation:spin 14s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .level{margin-top:20px;width:100%;max-width:280px;}
+  .level .row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px;}
+  .bar{height:8px;border-radius:6px;background:var(--card);overflow:hidden;}
+  .bar > div{height:100%;background:linear-gradient(90deg,var(--gold),var(--accent));width:0%;transition:width .25s ease;}
+
+  nav{display:flex;background:var(--bg2);border-top:1px solid rgba(255,255,255,.06);}
+  nav button{flex:1;background:none;border:none;color:var(--muted);padding:12px 0 10px;
+    font-size:11px;display:flex;flex-direction:column;align-items:center;gap:4px;}
+  nav button span.ic{font-size:20px;}
+  nav button.active{color:var(--gold);}
+
+  .screen{position:absolute;inset:0;top:0;background:var(--bg);z-index:5;overflow-y:auto;
+    display:flex;flex-direction:column;padding:16px 16px 90px;transform:translateY(100%);
+    transition:transform .28s ease;}
+  .screen.open{transform:translateY(0);}
+  .screen h2{margin:6px 0 4px;font-size:18px;}
+  .screen h3{margin:18px 0 10px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;}
+  .closeBtn{align-self:flex-end;background:var(--card);border:none;color:var(--text);
+    width:34px;height:34px;border-radius:50%;font-size:16px;margin-bottom:4px;}
+
+  .item{display:flex;justify-content:space-between;align-items:center;background:var(--card);
+    padding:13px 14px;border-radius:14px;margin-bottom:10px;}
+  .item .info{text-align:left;}
+  .item .info b{display:block;font-size:14px;}
+  .item .info small{color:var(--muted);display:block;margin-top:2px;font-size:11.5px;}
+  .buyBtn{background:linear-gradient(90deg,var(--good),#2fae78);border:none;color:#04241a;
+    font-weight:700;padding:9px 14px;border-radius:10px;font-size:13px;white-space:nowrap;}
+  .buyBtn:disabled{opacity:.4;}
+  .buyBtn.stars{background:linear-gradient(90deg,var(--gold),#ffb84d);color:#1a1200;}
+
+  .toast{position:fixed;left:50%;bottom:90px;transform:translate(-50%,20px);
+    background:var(--card);color:var(--text);padding:10px 18px;border-radius:20px;
+    font-size:13px;opacity:0;transition:all .25s ease;z-index:20;pointer-events:none;
+    box-shadow:0 6px 20px rgba(0,0,0,.4);max-width:80%;text-align:center;}
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+
+  .float{position:fixed;pointer-events:none;font-weight:800;color:var(--gold);font-size:20px;z-index:15;
+    animation:rise .7s ease forwards;}
+  @keyframes rise{to{transform:translateY(-60px);opacity:0;}}
+</style>
+</head>
+<body>
+<div id="space">
+  <div class="nebula"></div>
+  <div class="planet p1"></div>
+  <div class="planet p2"><div class="ring"></div></div>
+  <div class="planet p3"></div>
+  <canvas id="sky"></canvas>
+</div>
+
+<div id="app">
+  <header>
+    <div class="badge gold">💥 <span id="boomVal">0</span></div>
+    <div class="badge good">⚡ <span id="ppsVal">0</span>/s</div>
+  </header>
+
+  <main>
+    <h1>Boom Tapper</h1>
+    <div class="sub">Tap to earn Boom, buy machines that tap for you</div>
+    <div class="stats"><span>👊 Power: <b id="powerVal">1</b>/tap</span><span>🤖 Auto: <b id="autoVal">0</b>/s</span></div>
+    <div id="tapZone">💥</div>
+    <div class="level">
+      <div class="row"><span>Level <span id="lvlNum">1</span></span><span id="lvlXp">0 / 50</span></div>
+      <div class="bar"><div id="lvlBar"></div></div>
+    </div>
+  </main>
+
+  <nav>
+    <button class="active" data-tab="game"><span class="ic">🎮</span>Game</button>
+    <button data-tab="shop"><span class="ic">🛒</span>Upgrades</button>
+  </nav>
+</div>
+
+<div class="screen" id="shopScreen">
+  <button class="closeBtn" onclick="closeScreen()">✕</button>
+  <h2>Upgrades</h2>
+  <h3>👊 Tap Power</h3>
+  <div id="powerShop"></div>
+  <h3>🤖 Automatic Machines (pay with Boom)</h3>
+  <div id="genShop"></div>
+  <h3>⭐ Instant Pack — Telegram Stars</h3>
+  <div id="starShop"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================== STATE — in memory, auto-saved to Telegram CloudStorage ================== */
+const state = {
+  boom: 0,
+  power: 1,
+  level: 1, xp: 0, xpNeeded: 50,
+  gen: { robot:0, fabrica:0, reactor:0, laborator:0, portal:0, singularitate:0 },
+  boostBuys: 0,      // how many times the Stars pack was bought (price grows each time)
+  lastSeen: Date.now()
+};
+
+const GENERATORS = [
+  { id:'robot',         icon:'🤖', name:'Robo-Tapper',       desc:'+1 Boom/sec each',    baseCost:25,     perUnit:1,    growth:1.15 },
+  { id:'fabrica',       icon:'🏭', name:'Boom Factory',      desc:'+4 Boom/sec each',    baseCost:150,    perUnit:4,    growth:1.16 },
+  { id:'reactor',       icon:'⚛️', name:'Quantum Reactor',   desc:'+18 Boom/sec each',   baseCost:900,    perUnit:18,   growth:1.17 },
+  { id:'laborator',     icon:'🧪', name:'Secret Lab',        desc:'+80 Boom/sec each',   baseCost:5000,   perUnit:80,   growth:1.18 },
+  { id:'portal',        icon:'🌀', name:'Dimensional Portal',desc:'+300 Boom/sec each',  baseCost:30000,  perUnit:300,  growth:1.19 },
+  { id:'singularitate', icon:'🌌', name:'Singularity',       desc:'+1200 Boom/sec each', baseCost:200000, perUnit:1200, growth:1.20 },
+];
+const POWER_UPGRADE = { name:'Power Glove', desc:'+1 Boom per manual tap', baseCost:60, growth:1.3 };
+const BOOST_ITEM = { id:'boost2000', name:'2,000-Tap Pack', desc:'+2000 × your current power, instant', basePrice:20, growth:1.25 };
+
+function boostPrice(){ return Math.round(BOOST_ITEM.basePrice * Math.pow(BOOST_ITEM.growth, state.boostBuys)); }
+function genCost(g){ return Math.ceil(g.baseCost * Math.pow(g.growth, state.gen[g.id])); }
+function powerCost(){ return Math.ceil(POWER_UPGRADE.baseCost * Math.pow(POWER_UPGRADE.growth, state.power-1)); }
+function currentPps(){ return GENERATORS.reduce((s,g)=> s + state.gen[g.id]*g.perUnit, 0); }
+
+/* ================== TELEGRAM WEBAPP ================== */
+const tg = window.Telegram ? window.Telegram.WebApp : null;
+if (tg) { tg.ready(); tg.expand(); tg.setHeaderColor && tg.setHeaderColor('#0B0817'); }
+function vibrate(){ if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light'); }
+
+/* ---------- silent autosave via Telegram CloudStorage (no button, no server) ---------- */
+let saveTimer;
+function saveState(){
+  if (!(tg && tg.CloudStorage)) return;
+  state.lastSeen = Date.now();
+  const payload = JSON.stringify(state);
+  tg.CloudStorage.setItem('save', payload, ()=>{});
+}
+function scheduleSave(){ clearTimeout(saveTimer); saveTimer = setTimeout(saveState, 1200); }
+setInterval(saveState, 10000); // background autosave every 10s, invisible to the player
+
+function init(){
+  const finish = () => {
+    applyBotBonus();          // merge any Stars-purchase bonus sent back by the bot
+    computeOfflineEarnings(); // "welcome back" earnings while the game was closed
+    refreshHUD(); renderShop(); startLoops();
+    saveState();
+  };
+  if (tg && tg.CloudStorage){
+    tg.CloudStorage.getItem('save', (err, value)=>{
+      if (!err && value){
+        try{
+          const d = JSON.parse(value);
+          Object.assign(state, d);
+          if (d.gen) Object.assign(state.gen, d.gen);
+        }catch(e){}
+      }
+      finish();
+    });
+  } else { finish(); }
+}
+
+/* When returning from a Stars purchase, the bot appends the reward to the link */
+function applyBotBonus(){
+  const p = new URLSearchParams(location.search);
+  const bonus = Number(p.get('boomBonus') || 0);
+  const buys = p.get('boostBuys');
+  if (bonus > 0) state.boom += bonus;
+  if (buys !== null && !isNaN(Number(buys))) state.boostBuys = Number(buys);
+  if (bonus > 0) setTimeout(()=>showToast(`Purchase complete: +${bonus} 💥 Boom`), 400);
+}
+
+function computeOfflineEarnings(){
+  const pps = currentPps();
+  if (!state.lastSeen || pps <= 0) return;
+  const elapsed = Math.max(0, Math.min((Date.now()-state.lastSeen)/1000, 8*3600)); // cap 8h
+  const earned = Math.floor(elapsed * pps);
+  if (earned > 5){
+    state.boom += earned;
+    setTimeout(()=>showToast(`Welcome back! +${earned} 💥 earned while you were away`), 500);
+  }
+}
+
+/* Buying with Stars: sendData closes the WebApp (Telegram limitation) — the bot
+   creates the invoice, and after payment reopens the game with the reward attached. */
+function buyBoost(){
+  if (tg && tg.sendData){
+    tg.sendData(JSON.stringify({ action:'buy', item:BOOST_ITEM.id, power: state.power }));
+  } else {
+    showToast('Only available inside Telegram');
+  }
+}
+
+/* ================== GAME LOGIC ================== */
+function addBoom(n){
+  state.boom += n; state.xp += n;
+  while (state.xp >= state.xpNeeded){
+    state.xp -= state.xpNeeded; state.level++;
+    state.xpNeeded = Math.round(state.xpNeeded * 1.35);
+    showToast(`Level up! Level ${state.level}`);
+  }
+}
+function tap(e){
+  addBoom(state.power);
+  vibrate();
+  spawnFloat(e, `+${state.power}`);
+  burst(Math.min(24, 6 + state.power));
+  refreshHUD();
+  scheduleSave();
+}
+function startLoops(){
+  setInterval(()=>{
+    const pps = currentPps();
+    if (pps > 0){ addBoom(pps); refreshHUD(); } // automatic tick: NO animation, only the number grows
+  }, 1000);
+}
+
+function refreshHUD(){
+  document.getElementById('boomVal').textContent = Math.floor(state.boom);
+  document.getElementById('ppsVal').textContent = currentPps();
+  document.getElementById('powerVal').textContent = state.power;
+  document.getElementById('autoVal').textContent = currentPps();
+  document.getElementById('lvlNum').textContent = state.level;
+  document.getElementById('lvlXp').textContent = `${Math.floor(state.xp)} / ${state.xpNeeded}`;
+  document.getElementById('lvlBar').style.width = Math.min(100, (state.xp/state.xpNeeded)*100) + '%';
+}
+function spawnFloat(e, text){
+  const f = document.createElement('div');
+  f.className = 'float'; f.textContent = text;
+  const rect = e.target.getBoundingClientRect();
+  f.style.left = (rect.left + rect.width/2 - 10) + 'px';
+  f.style.top  = (rect.top + rect.height/2) + 'px';
+  document.body.appendChild(f);
+  setTimeout(()=>f.remove(), 700);
+}
+
+/* ================== UI: TABS / SHOP SCREEN ================== */
+document.querySelectorAll('nav button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    if (btn.dataset.tab==='shop'){ renderShop(); document.getElementById('shopScreen').classList.add('open'); }
+    else { closeScreen(); }
+  });
+});
+function closeScreen(){
+  document.getElementById('shopScreen').classList.remove('open');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.querySelector('nav button[data-tab="game"]').classList.add('active');
+}
+
+function renderShop(){
+  const pCost = powerCost();
+  document.getElementById('powerShop').innerHTML = `
+    <div class="item">
+      <div class="info"><b>👊 ${POWER_UPGRADE.name} (level ${state.power})</b><small>${POWER_UPGRADE.desc}</small></div>
+      <button class="buyBtn" ${state.boom<pCost?'disabled':''} onclick="buyPower()">💥 ${pCost}</button>
+    </div>`;
+
+  const gDiv = document.getElementById('genShop');
+  gDiv.innerHTML = '';
+  GENERATORS.forEach(g=>{
+    const cost = genCost(g);
+    const row = document.createElement('div');
+    row.className = 'item';
+    row.innerHTML = `
+      <div class="info"><b>${g.icon} ${g.name} (x${state.gen[g.id]})</b><small>${g.desc}</small></div>
+      <button class="buyBtn" ${state.boom<cost?'disabled':''}>💥 ${cost}</button>`;
+    row.querySelector('button').onclick = ()=>buyGen(g);
+    gDiv.appendChild(row);
+  });
+
+  document.getElementById('starShop').innerHTML = `
+    <div class="item">
+      <div class="info"><b>${BOOST_ITEM.name}${state.boostBuys?` (bought ${state.boostBuys}x)`:''}</b><small>${BOOST_ITEM.desc} · price increases every purchase</small></div>
+      <button class="buyBtn stars" onclick="buyBoost()">⭐ ${boostPrice()}</button>
+    </div>`;
+}
+
+function buyPower(){
+  const cost = powerCost();
+  if (state.boom < cost) return;
+  state.boom -= cost; state.power += 1;
+  refreshHUD(); renderShop(); saveState(); showToast(`Power increased: ${state.power} Boom/tap`);
+}
+function buyGen(g){
+  const cost = genCost(g);
+  if (state.boom < cost) return;
+  state.boom -= cost; state.gen[g.id] += 1;
+  refreshHUD(); renderShop(); saveState(); showToast(`${g.name} installed!`);
+}
+
+/* Toast */
+let toastTimer;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+/* ================== ANIMATED STARFIELD + TAP PARTICLES (canvas, transparent) ================== */
+const canvas = document.getElementById('sky');
+const ctx = canvas.getContext('2d');
+let W,H,stars=[];
+function resize(){
+  W = canvas.width = innerWidth; H = canvas.height = innerHeight;
+  stars = Array.from({length:90}, ()=>({
+    x:Math.random()*W, y:Math.random()*H, r:Math.random()*1.6+0.3,
+    s:Math.random()*0.5+0.1, a:Math.random()
+  }));
+}
+window.addEventListener('resize', resize); resize();
+
+let particles = [];
+function burst(count){
+  const cx = W/2, cy = H*0.42;
+  for(let i=0;i<count;i++){
+    particles.push({
+      x:cx, y:cy, vx:(Math.random()-0.5)*7, vy:(Math.random()-0.5)*7,
+      life:1, color: Math.random()>0.5 ? '255,209,102' : '255,107,74'
+    });
+  }
+}
+function loop(){
+  ctx.clearRect(0,0,W,H); // transparent — planets/nebula show through behind the stars
+  stars.forEach(s=>{
+    s.a += s.s*0.02;
+    ctx.globalAlpha = 0.4 + 0.6*Math.abs(Math.sin(s.a));
+    ctx.fillStyle = '#F5EEFB';
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,7); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+  particles.forEach(p=>{
+    p.x+=p.vx; p.y+=p.vy; p.life-=0.03; p.vy+=0.05;
+    ctx.fillStyle = `rgba(${p.color},${Math.max(p.life,0)})`;
+    ctx.beginPath(); ctx.arc(p.x,p.y,3,0,7); ctx.fill();
+  });
+  particles = particles.filter(p=>p.life>0);
+  requestAnimationFrame(loop);
+}
+loop();
+
+document.getElementById('tapZone').addEventListener('click', tap);
+init();
+</script>
+</body>
+</html>
